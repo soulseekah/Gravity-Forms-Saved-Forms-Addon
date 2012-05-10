@@ -48,7 +48,7 @@
 
 		public function init() {
 			/* Load languages if available */
-			load_plugin_textdomain( self::$textdomain, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
+			load_plugin_textdomain( self::$textdomain, false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
 		}
 
