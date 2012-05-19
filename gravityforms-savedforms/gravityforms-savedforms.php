@@ -26,7 +26,7 @@
 
 		public function bootstrap() {
 			/* Attach hooks and other early initialization */
-			add_action( 'init', array( $this, 'init' ) );
+			add_action( 'plugins_loaded', array( $this, 'early_init' ) );
 
 			/* Form editor script */
 			add_action( 'gform_editor_js', array( $this, 'editor_script' ) );
@@ -46,7 +46,7 @@
 			add_filter( 'gform_addon_navigation', array( $this, 'add_pending_completed_entries_item' ) );
 		}
 
-		public function init() {
+		public function early_init() {
 			/* Load languages if available */
 			load_plugin_textdomain( self::$textdomain, false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
 
