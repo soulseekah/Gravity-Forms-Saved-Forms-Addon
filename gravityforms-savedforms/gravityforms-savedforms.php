@@ -107,8 +107,8 @@
 
 		public function form_add_save_button( $button_input, $form ) {
 			/* there's nothing to be done if form state or login requirements are off */
-			if ( !isset($form['requireLogin']) || !isset($form['enableFormState']) ) return $form;
-			if ( !$form['requireLogin'] || !$form['enableFormState'] ) return $form;
+			if ( !isset($form['requireLogin']) || !isset($form['enableFormState']) ) return $button_input;
+			if ( !$form['requireLogin'] || !$form['enableFormState'] ) return $button_input;
 
 			$tabindex_match = false; /* get the proper tabindex */
 			if ( preg_match( "#tabindex\\s*=\\s*[\"'](\\d+)[\"']#", $button_input, $_tabindex_match ) == 1 ) {
