@@ -28,8 +28,9 @@
 			/* Attach hooks and other early initialization */
 			add_action( 'plugins_loaded', array( $this, 'early_init' ) );
 
-			/* Form editor script */
-			add_action( 'gform_editor_js', array( $this, 'editor_script' ) );
+			/* Form editor script - using admin_footer for consistency between GF 1.7 and previous versions
+                where the form settings have moved and the gform_editor_js hook is not available */
+			add_action( 'admin_footer', array( $this, 'editor_script' ) );
 
 			/* Form Settings/Advanced */
 			add_action( 'gform_advanced_settings', array( $this, 'advanced_form_settings' ), null, 2 );
@@ -63,6 +64,10 @@
 		}
 
 		public function editor_script() {
+
+            if( rgget('page') != 'gf_edit_forms' )
+                return;
+
 			?><script type="text/javascript">
 				jQuery("#gform_enable_form_state").attr("checked", form.enableFormState ? true : false).change(function() {
 					form.enableFormState = jQuery("#gform_enable_form_state").is(":checked");
@@ -89,13 +94,24 @@
 					if ( !isset( $lead[strval( $input_id )] ) ) continue;
 
 					$input_name = 'input_' . str_replace( '.', '_', strval( $input_id ) );
+
+                    // only add value from saved lead if new value is not entered
+                    if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
+                        continue;
+
 					$_POST[$input_name] = $lead[strval( $input_id )];
 
 				} else foreach ( $form_part['inputs'] as $input ) { /* multi-part */
 					if ( !isset( $lead[strval( $input['id'] )] ) ) continue;
 
 					$input_name = 'input_' . str_replace( '.', '_', strval( $input['id'] ) );
+
+                    // only add value from saved lead if new value is not entered
+                    if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
+                        continue;
+
 					$_POST[$input_name] = $lead[strval( $input['id'] )];
+
 				}
 
 			}
@@ -316,4 +332,3 @@
 	}
 
 	if ( defined( 'WP_CONTENT_DIR' ) ) new GFStatefulForms; /* initialize */
-?>
