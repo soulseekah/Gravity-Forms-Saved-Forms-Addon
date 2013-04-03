@@ -42,6 +42,8 @@
 			add_filter( 'gform_confirmation', array( $this, 'form_save_confirmation' ), null, 4 );
 			add_filter( 'gform_disable_user_notification', array( $this, 'disable_notification_on_save' ), null, 3 );
 			add_filter( 'gform_disable_admin_notification', array( $this, 'disable_notification_on_save' ), null, 3 );
+			add_action( 'gform_enqueue_scripts', array( $this, 'enqueue_frontend_javascript' ), null, 2 );
+			add_action( 'init', array( $this, 'maybe_save_confirmation' ) );
 
 			/* Pending and completed entries */
 			add_filter( 'gform_addon_navigation', array( $this, 'add_pending_completed_entries_item' ) );
@@ -58,15 +60,15 @@
 			?>
 				<li>
 					<input type="checkbox" id="gform_enable_form_state" />
-					<label for="gform_enable_form_state"><?php _e( "Enable form state (being a user is required)", self::$textdomain ) ?></label>
+					<label for="gform_enable_form_state"><?php _e( "Enable form state (being a user is required, enable \"Require Login\" above)", self::$textdomain ) ?></label>
 				</li>
 			<?php
 		}
 
 		public function editor_script() {
 
-            if( rgget('page') != 'gf_edit_forms' )
-                return;
+			if( rgget('page') != 'gf_edit_forms' )
+				return;
 
 			?><script type="text/javascript">
 				jQuery("#gform_enable_form_state").attr("checked", form.enableFormState ? true : false).change(function() {
@@ -95,9 +97,9 @@
 
 					$input_name = 'input_' . str_replace( '.', '_', strval( $input_id ) );
 
-                    // only add value from saved lead if new value is not entered
-                    if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
-                        continue;
+					// only add value from saved lead if new value is not entered
+					if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
+						continue;
 
 					$_POST[$input_name] = $lead[strval( $input_id )];
 
@@ -106,9 +108,9 @@
 
 					$input_name = 'input_' . str_replace( '.', '_', strval( $input['id'] ) );
 
-                    // only add value from saved lead if new value is not entered
-                    if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
-                        continue;
+					// only add value from saved lead if new value is not entered
+					if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
+						continue;
 
 					$_POST[$input_name] = $lead[strval( $input['id'] )];
 
@@ -131,9 +133,17 @@
 				$tabindex_match = intval( $_tabindex_match[1] ) + 1;
 			}
 
-			$button_input .= '<input type="submit" id="gform_save_state_'.$form['id'].'" class="button gform_button" name="gform_save_state_'.$form['id'].'" value="'
+			$button_input .= '<input type="submit" id="gform_save_state_'.$form['id'].'" class="gform_save_state button gform_button" name="gform_save_state_'.$form['id'].'" value="'
 							.__( "Save for later", self::$textdomain ).'" tabindex="'.$tabindex_match.'">';
 			return $button_input;
+		}
+
+		public function enqueue_frontend_javascript( $form, $is_ajax ) {
+			/* For multi-page forms, the save button has to also show */
+			if ( !isset($form['requireLogin']) || !isset($form['enableFormState']) ) return;
+			if ( !$form['requireLogin'] || !$form['enableFormState'] ) return;
+			if ( !GFCommon::has_pages( $form ) ) return;
+			wp_enqueue_script( 'gravityforms-savedforms', plugins_url( 'gravityforms-savedforms.js', __FILE__ ), array( 'jquery' ) );
 		}
 
 		public function form_submit_save_autovalidate( $validation_result ) {
@@ -172,6 +182,30 @@
 
 			$confirmation = __( 'Your progress has been saved. You can return to this form anytime in the future to complete it.' );
 			return $confirmation;
+		}
+
+		public function maybe_save_confirmation() {
+			/* On paged forms all processing is suppressed, so we still need to do something */
+			$form_id = isset( $_POST['gform_submit'] ) ? $_POST['gform_submit'] : 0;
+			if ( !$form_id ) return;
+
+			if ( !isset( $_POST['gform_save_state_'.$form_id] ) ) return;
+
+			$form_info = RGFormsModel::get_form( $form_id );
+			$is_valid_form = $form_info && $form_info->is_active;
+
+			if ( !$is_valid_form ) return;
+
+			$form = RGFormsModel::get_form_meta( $form_id );
+
+			if ( !isset($form['requireLogin']) || !isset($form['enableFormState']) ) return;
+			if ( !$form['requireLogin'] || !$form['enableFormState'] ) return;
+			if ( !GFCommon::has_pages( $form ) ) return;
+
+			/* Spoof the page number and make-believe */
+			$_POST[ "gform_target_page_number_{$form_id}" ] = 65535;
+			require_once( GFCommon::get_base_path() . '/form_display.php' );
+			GFFormDisplay::process_form( $form_id );
 		}
 
 		public function disable_notification_on_save( $is_disabled, $form, $entry ) {
