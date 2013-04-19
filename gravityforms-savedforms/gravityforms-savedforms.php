@@ -91,7 +91,7 @@
 			/* populate the available values */
 			foreach ( $form['fields'] as $form_part ) {
 
-				if ( $form_part['inputs'] === null ) { /* single-part */
+				if ( $form_part['inputs'] === null || $form_part['inputs'] === '' ) { /* single-part */
 					$input_id = $form_part['id'];
 					if ( !isset( $lead[strval( $input_id )] ) ) continue;
 
