@@ -51,8 +51,7 @@
 
 		public function early_init() {
 			/* Load languages if available */
-			load_plugin_textdomain( self::$textdomain, false, dirname( plugin_basename( __FILE__ ) ) . '/languages' );
-
+			load_plugin_textdomain( self::$textdomain, false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
 		}
 
 		public function advanced_form_settings( $position, $form_id ) {

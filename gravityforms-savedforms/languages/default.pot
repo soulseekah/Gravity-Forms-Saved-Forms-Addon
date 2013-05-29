@@ -1,0 +1,48 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: Gravity Forms Saved Forms\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2013-05-30 01:35+0600\n"
+"PO-Revision-Date: 2013-05-30 01:35+0600\n"
+"Last-Translator: Gennady Kovshenin <gennady@kovshenin.com>\n"
+"Language-Team: \n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: gravityforms-savedforms.php:63
+msgid ""
+"Enable form state (being a user is required, enable \"Require Login\" above)"
+msgstr ""
+
+#: gravityforms-savedforms.php:137
+msgid "Save for later"
+msgstr ""
+
+#: gravityforms-savedforms.php:183
+msgid ""
+"Your progress has been saved. You can return to this form anytime in the "
+"future to complete it."
+msgstr ""
+
+#: gravityforms-savedforms.php:226
+msgid "Pending/Completed Entries"
+msgstr ""
+
+#: gravityforms-savedforms.php:240
+#, php-format
+msgid "You don't have any active forms. Let's go %screate one%s"
+msgstr ""
+
+#: gravityforms-savedforms.php:253
+msgid "Pending/Completed Entries for "
+msgstr ""
+
+#: gravityforms-savedforms.php:293
+msgid "Select A Form"
+msgstr ""
+
+#: gravityforms-savedforms.php:298
+msgid "Switch Form"
+msgstr ""
