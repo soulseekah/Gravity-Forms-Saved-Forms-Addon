@@ -160,7 +160,7 @@
 
 		public function form_save_confirmation( $confirmation, $form, $lead, $ajax ) {
 
-			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] ) return $confrimation;
+			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] ) return $confirmation;
 
 			$user = wp_get_current_user();
 
