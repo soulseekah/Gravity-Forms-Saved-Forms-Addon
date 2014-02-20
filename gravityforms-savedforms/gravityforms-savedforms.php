@@ -179,6 +179,8 @@
 			/* set lead to pending */
 			RGFormsModel::update_lead_property( $lead['id'], 'status', 'pending', false, true );
 
+			do_action( 'gform_save_state', $form, $lead );
+
 			$confirmation = __( 'Your progress has been saved. You can return to this form anytime in the future to complete it.' );
 			return $confirmation;
 		}
