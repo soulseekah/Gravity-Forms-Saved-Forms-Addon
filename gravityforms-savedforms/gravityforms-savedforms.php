@@ -3,7 +3,7 @@
 		Plugin Name: Gravity Forms Saved Forms Add-On
 		Author: Gennady Kovshenin
 		Description: Adds state to forms allowing users to save form for later
-		Version: 0.4
+		Version: 0.4.1
 		Author URI: http://codeseekah.com
 	*/
 
@@ -78,7 +78,7 @@
 		}
 
 		public function try_restore_saved_state( $form ) {
-			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] )  return $form;
+			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] ) return $form;
 
 			$user = wp_get_current_user();
 
@@ -233,7 +233,8 @@
 		}
 
 		public function pending_completed_entries_screen() {
-			$forms = RGFormsModel::get_forms(null, "title");
+
+			$forms = RGFormsModel::get_forms( null, 'title' );
 			$id = RGForms::get( 'id' );
 			if( sizeof($forms) == 0 ) {
 				?>
@@ -246,7 +247,13 @@
 				if( empty($id) ) $form_id = $forms[0]->id;
 				else $form_id = $id;
 			}
-			$form = RGFormsModel::get_form_meta($form_id);
+			$form = RGFormsModel::get_form_meta( $form_id );
+
+			if ( isset( $_GET['clear'] ) ):
+				check_admin_referer( 'gfstate-clear' );
+				$this->cleanup_saved_entries( $form['id'] ); /* cleanup while we're here */
+			endif;
+
 			?>
 				<link rel="stylesheet" href="<?php echo GFCommon::get_base_url() ?>/css/admin.css" type="text/css" />
 				<div class="wrap">
@@ -333,12 +340,18 @@
 								<li><a href="user-edit.php?user_id=<?php echo $user->ID; ?>"><?php echo $user->display_name; ?></a></li>
 							<?php endforeach; endif; ?>
 						</ul>
+						<hr />
+						<a class="gfstate-clear" href="<?php echo wp_nonce_url( add_query_arg( 'clear', true ), 'gfstate-clear' ); ?>">clear all pending entries</a>
+						<script type="text/javascript">
+							jQuery( 'a.gfstate-clear' ).click( function( e ) {
+								if ( !confirm( <?php echo json_encode( __( 'Are you sure you want to do this?', self::$textdomain ) ); ?> ) )
+									e.preventDefault();
+							} );
+						</script>
 					<?php endif; ?>
 				</div>
-
 				</div> <!-- /wrap -->
 			<?php
-			$this->cleanup_saved_entries( $form['id'] ); /* cleanup while we're here */
 		}
 
 		public function get_users( $form_id, $completed = true ) {
@@ -363,6 +376,11 @@
 			/* Removes all entries/leads that are not tied to a user */
 			$leads = RGFormsModel::get_leads( $form_id, 0, 'DESC', '', 0, $max, null, null, false, null, null, 'pending' );
 			RGFormsModel::delete_leads( $leads );
+			foreach ( $this->get_users( $form_id, false ) as $user ) {
+				if ( $user->pending_entry ) {
+					delete_user_meta( $user->ID, 'has_pending_form_'.$form_id );
+				}
+			}
 		}
 	}
 
