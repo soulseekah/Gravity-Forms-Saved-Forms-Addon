@@ -89,7 +89,6 @@
 
 			/* populate the available values */
 			foreach ( $form['fields'] as $form_part ) {
-
 				if ( $form_part['inputs'] === null || $form_part['inputs'] === '' ) { /* single-part */
 					$input_id = $form_part['id'];
 					if ( !isset( $lead[strval( $input_id )] ) ) continue;
@@ -100,7 +99,7 @@
 					if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
 						continue;
 
-					$_POST[$input_name] = $lead[strval( $input_id )];
+					$_POST[$input_name] = $this->maybe_transform_data( $lead[strval( $input_id )], $lead, $form_part, $form );
 
 				} else foreach ( $form_part['inputs'] as $input ) { /* multi-part */
 					if ( !isset( $lead[strval( $input['id'] )] ) ) continue;
@@ -111,7 +110,7 @@
 					if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
 						continue;
 
-					$_POST[$input_name] = $lead[strval( $input['id'] )];
+					$_POST[$input_name] = $this->maybe_transform_data( $lead[strval( $input['id'] )], $lead, $form_part, $form );
 
 				}
 
@@ -120,6 +119,17 @@
 			$_POST['is_submit_'.$form['id']] = '1'; /* force the form to be poisoned */
 
 			return $form;
+		}
+
+		private function maybe_transform_data( $data, $lead, $form_part, $form ) {
+			if ( $form_part['type']  == 'list' && $form_part['enableColumns'] ) {
+				$_data = array();
+				foreach ( unserialize( $data ) as $row ) {
+					$_data = array_merge( $_data, array_values( $row ) );
+				}
+				return $_data;
+			}
+			return $data;
 		}
 
 		public function form_add_save_button( $button_input, $form ) {
