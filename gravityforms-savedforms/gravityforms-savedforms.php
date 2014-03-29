@@ -250,7 +250,14 @@
 		public function disable_notification_on_save( $is_disabled, $notification, $form, $entry ) {
 			if ( !isset( $form['enableFormState'] ) ) return $is_disabled;
 			if ( !$form['enableFormState'] ) return $is_disabled;
-			if ( !isset( $_POST['gform_save_state_'.$form['id']] ) ) return $is_disabled;
+
+			if ( !isset( $_POST['gform_save_state_'.$form['id']] ) ) {
+				/* This is a real submit */
+				$is_disabled = isset( $notification['sendOnSave'] ) && $notification['sendOnSave'];
+				return $is_disabled;
+			}
+
+			/* This is a save submit */
 			if ( isset( $notification['sendOnSave'] ) && $notification['sendOnSave'] ) return $is_disabled;
 			
 			$is_disabled = true;
