@@ -3,7 +3,7 @@
 		Plugin Name: Gravity Forms Saved Forms Add-On
 		Author: Gennady Kovshenin
 		Description: Adds state to forms allowing users to save form for later
-		Version: 0.4.1
+		Version: 0.4.2
 		Author URI: http://codeseekah.com
 	*/
 
@@ -34,14 +34,15 @@
 
 			/* Form Settings/Advanced */
 			add_action( 'gform_advanced_settings', array( $this, 'advanced_form_settings' ), null, 2 );
+			add_filter( 'gform_notification_ui_settings', array( $this, 'notification_settings' ), null, 3 );
+			add_filter( 'gform_pre_notification_save', array( $this, 'save_notification_settings' ), null, 2 );
 
 			/* Form frontend logic */
 			add_filter( 'gform_pre_render', array( $this, 'try_restore_saved_state' ) );
 			add_filter( 'gform_submit_button', array( $this, 'form_add_save_button'), null, 2 );
 			add_filter( 'gform_validation', array( $this, 'form_submit_save_autovalidate' ) );
 			add_filter( 'gform_confirmation', array( $this, 'form_save_confirmation' ), null, 4 );
-			add_filter( 'gform_disable_user_notification', array( $this, 'disable_notification_on_save' ), null, 3 );
-			add_filter( 'gform_disable_admin_notification', array( $this, 'disable_notification_on_save' ), null, 3 );
+			add_filter( 'gform_disable_notification', array( $this, 'disable_notification_on_save' ), null, 4 );
 			add_action( 'gform_enqueue_scripts', array( $this, 'enqueue_frontend_javascript' ), null, 2 );
 			add_action( 'init', array( $this, 'maybe_save_confirmation' ) );
 
@@ -65,16 +66,43 @@
 		}
 
 		public function editor_script() {
-
 			if( rgget('page') != 'gf_edit_forms' )
 				return;
 
-			?><script type="text/javascript">
-				jQuery("#gform_enable_form_state").attr("checked", form.enableFormState ? true : false).change(function() {
-					form.enableFormState = jQuery("#gform_enable_form_state").is(":checked");
-				});
-				form.enableFormState = jQuery("#gform_enable_form_state").is(":checked");
-			</script><?php
+			?>
+				<script type="text/javascript">
+					jQuery( '#gform_enable_form_state' ).attr( 'checked', form.enableFormState ? true : false ).change( function() {
+						form.enableFormState = jQuery( '#gform_enable_form_state' ).is( ':checked' );
+					} );
+					form.enableFormState = jQuery( '#gform_enable_form_state' ).is( ':checked' );
+				</script>
+			<?php
+		}
+
+		public function notification_settings( $ui_settings, $notification, $form ) {
+			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] ) return $ui_settings;
+
+			ob_start();
+			?>
+				<tr valign="top">
+					<th scope="row">
+						<label for="gform_notification_send_on_save_state"><?php _e( 'Send on save state', 'gravityforms' ); ?></label>
+					</th>
+					<td>
+						<?php if ( !isset( $notification['sendOnSave'] ) ) $notification['sendOnSave'] = false; ?>
+						<input type="checkbox" name="gform_notification_send_on_save_state" id="gform_notification_send_on_save_state" value="1" <?php checked( $notification['sendOnSave'], true ); ?>/>
+						<label for="gform_notification_send_on_save_state" class="inline"><?php _e( 'Send this notification when the form is saved', 'gravityforms' ); ?></label>
+					</td>
+				</tr>
+			<?php
+			$ui_settings['notification_send_on_save_state'] = ob_get_clean();
+
+			return $ui_settings;
+		}
+
+		public function save_notification_settings( $notification, $form ) {
+			$notification['sendOnSave'] = isset( $_POST['gform_notification_send_on_save_state'] );
+			return $notification;
 		}
 
 		public function try_restore_saved_state( $form ) {
@@ -219,12 +247,12 @@
 			GFFormDisplay::process_form( $form_id );
 		}
 
-		public function disable_notification_on_save( $is_disabled, $form, $entry ) {
-
+		public function disable_notification_on_save( $is_disabled, $notification, $form, $entry ) {
 			if ( !isset( $form['enableFormState'] ) ) return $is_disabled;
 			if ( !$form['enableFormState'] ) return $is_disabled;
 			if ( !isset( $_POST['gform_save_state_'.$form['id']] ) ) return $is_disabled;
-
+			if ( isset( $notification['sendOnSave'] ) && $notification['sendOnSave'] ) return $is_disabled;
+			
 			$is_disabled = true;
 			return $is_disabled;
 		}
