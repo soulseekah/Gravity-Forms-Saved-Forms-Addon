@@ -3,7 +3,7 @@
 		Plugin Name: Gravity Forms Saved Forms Add-On
 		Author: Gennady Kovshenin
 		Description: Adds state to forms allowing users to save form for later
-		Version: 0.4.2
+		Version: 0.4.3
 		Author URI: http://codeseekah.com
 	*/
 
@@ -33,7 +33,7 @@
 			add_action( 'admin_footer', array( $this, 'editor_script' ) );
 
 			/* Form Settings/Advanced */
-			add_action( 'gform_advanced_settings', array( $this, 'advanced_form_settings' ), null, 2 );
+			add_filter( 'gform_form_settings', array( $this, 'save_form_settings' ), null, 2 );
 			add_filter( 'gform_notification_ui_settings', array( $this, 'notification_settings' ), null, 3 );
 			add_filter( 'gform_pre_notification_save', array( $this, 'save_notification_settings' ), null, 2 );
 
@@ -55,14 +55,41 @@
 			load_plugin_textdomain( self::$textdomain, false, dirname( plugin_basename( __FILE__ ) ) . '/languages/' );
 		}
 
-		public function advanced_form_settings( $position, $form_id ) {
-			if ( $position != 800 ) return; /* need bottom of form */
+		public function save_form_settings( $form_settings, $form ) {
+			$tooltip = __( 'Saves partially filled forms for logged in users. Being a user is required, enable "Require Login" above.', self::$textdomain );
+			ob_start();
 			?>
-				<li>
-					<input type="checkbox" id="gform_enable_form_state" />
-					<label for="gform_enable_form_state"><?php _e( "Enable form state (being a user is required, enable \"Require Login\" above)", self::$textdomain ) ?></label>
-				</li>
+				<tr>
+					<th>
+						<?php esc_html_e( 'Save forms', self::$textdomain ); ?> <a href='#' onclick='return false;' class='gf_tooltip tooltip tooltip_form_description' title="<?php echo esc_attr( $tooltip ); ?>"><i class='fa fa-question-circle'></i></a>
+					</th>
+					<td>
+						<input type="checkbox" id="gform_enable_form_state" />
+						<label for="gform_enable_form_state"><?php esc_html_e( 'Enable form state', self::$textdomain ) ?></label>
+					</td>
+				</tr>
+				<tr id="gform_enable_form_state_on_submit_row" class="child_setting_row" style="display: none;">
+					<td colspan="2" class="gf_sub_settings_cell">
+						<div class="gf_animate_sub_settings">
+							<table>
+								<tr>
+									<th>
+										<?php $tooltip = __( 'After submitting the data will still be retained and will be prefilled when visiting the form again.', self::$textdomain ); ?>
+										<?php esc_html_e( 'Save form on submit' );?> <a href='#' onclick='return false;' class='gf_tooltip tooltip tooltip_form_description' title="<?php echo esc_attr( $tooltip ); ?>"><i class='fa fa-question-circle'></i></a>
+									</th>
+									<td>
+										<input type="checkbox" id="gform_enable_form_state_on_submit" />
+										<label for="gform_enable_form_state_on_submit"><?php esc_html_e( 'Save form state even after submit', self::$textdomain ) ?></label>
+									</td>
+								</tr>
+							</table>
+						</div>
+					</td>
+				</tr>
 			<?php
+			$form_settings['Form Options']['saved_forms'] = ob_get_clean();
+
+			return $form_settings;
 		}
 
 		public function editor_script() {
@@ -73,8 +100,13 @@
 				<script type="text/javascript">
 					jQuery( '#gform_enable_form_state' ).attr( 'checked', form.enableFormState ? true : false ).change( function() {
 						form.enableFormState = jQuery( '#gform_enable_form_state' ).is( ':checked' );
-					} );
-					form.enableFormState = jQuery( '#gform_enable_form_state' ).is( ':checked' );
+						if ( form.enableFormState ) ShowSettingRow( '#gform_enable_form_state_on_submit_row' );
+						else HideSettingRow( '#gform_enable_form_state_on_submit_row' );
+					} ).trigger( 'change' );
+					
+					jQuery( '#gform_enable_form_state_on_submit' ).attr( 'checked', form.enableFormStateOnSubmit ? true : false ).change( function() {
+						form.enableFormStateOnSubmit = jQuery( '#gform_enable_form_state_on_submit' ).is( ':checked' );
+					} ).trigger( 'change' );
 				</script>
 			<?php
 		}
@@ -202,9 +234,17 @@
 			$user = wp_get_current_user();
 
 			if ( !isset( $_POST['gform_save_state_'.$form['id']] ) ) {
+				if ( !empty( $form['enableFormStateOnSubmit'] ) && $form['enableFormStateOnSubmit'] ) {
+					/* still save, but do submit, thanks */
+					update_user_meta( $user->ID, 'completed_form_'.$form['id'], $lead['id'] );
+					update_user_meta( $user->ID, 'has_pending_form_'.$form['id'], $lead['id'] );
+					return $confirmation;
+				}
+
 				/* remove all saved data for this form and user */
 				delete_user_meta( $user->ID, 'has_pending_form_'.$form['id'] );
 				update_user_meta( $user->ID, 'completed_form_'.$form['id'], $lead['id'] );
+
 				return $confirmation;
 			}
 
