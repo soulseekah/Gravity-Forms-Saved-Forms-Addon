@@ -184,7 +184,8 @@
 		private function maybe_transform_data( $data, $lead, $form_part, $form ) {
 			if ( $form_part['type']  == 'list' && $form_part['enableColumns'] ) {
 				$_data = array();
-				foreach ( unserialize( $data ) as $row ) {
+				$data = unserialize( $data );
+				foreach ( is_array( $data ) ? $data : array() as $row ) {
 					$_data = array_merge( $_data, array_values( $row ) );
 				}
 				return $_data;
