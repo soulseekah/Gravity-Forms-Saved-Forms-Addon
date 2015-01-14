@@ -139,6 +139,12 @@
 
 		public function try_restore_saved_state( $form ) {
 			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] ) return $form;
+			/**
+			 * We are currently unable to restore values of a saved form
+			 * when a different form on the page is being navigated, saved or
+			 * submitted. See issue #27.
+			 */
+			if ( isset( $_POST['gform_submit'] ) && $_POST['gform_submit'] != $form['id'] ) return $form;
 
 			$user = wp_get_current_user();
 
