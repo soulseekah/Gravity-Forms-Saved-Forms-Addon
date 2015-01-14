@@ -3,7 +3,7 @@
 		Plugin Name: Gravity Forms Saved Forms Add-On
 		Author: Gennady Kovshenin
 		Description: Adds state to forms allowing users to save form for later
-		Version: 0.4.3
+		Version: 0.4.3.1
 		Author URI: http://codeseekah.com
 	*/
 
