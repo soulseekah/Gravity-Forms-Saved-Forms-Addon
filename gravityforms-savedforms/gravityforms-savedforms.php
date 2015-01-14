@@ -40,10 +40,10 @@
 			/* Form frontend logic */
 			add_filter( 'gform_pre_render', array( $this, 'try_restore_saved_state' ) );
 			add_filter( 'gform_submit_button', array( $this, 'form_add_save_button'), null, 2 );
+			add_filter( 'gform_next_button', array( $this, 'form_add_save_button'), null, 2 );
 			add_filter( 'gform_validation', array( $this, 'form_submit_save_autovalidate' ) );
 			add_filter( 'gform_confirmation', array( $this, 'form_save_confirmation' ), null, 4 );
 			add_filter( 'gform_disable_notification', array( $this, 'disable_notification_on_save' ), null, 4 );
-			add_action( 'gform_enqueue_scripts', array( $this, 'enqueue_frontend_javascript' ), null, 2 );
 			add_action( 'init', array( $this, 'maybe_save_confirmation' ) );
 
 			/* Pending and completed entries */
@@ -206,14 +206,6 @@
 			$button_input .= '<input type="submit" id="gform_save_state_'.$form['id'].'" class="gform_save_state button gform_button" name="gform_save_state_'.$form['id'].'" value="'
 							.__( "Save for later", self::$textdomain ).'" tabindex="'.$tabindex_match.'">';
 			return $button_input;
-		}
-
-		public function enqueue_frontend_javascript( $form, $is_ajax ) {
-			/* For multi-page forms, the save button has to also show */
-			if ( !isset($form['requireLogin']) || !isset($form['enableFormState']) ) return;
-			if ( !$form['requireLogin'] || !$form['enableFormState'] ) return;
-			if ( !GFCommon::has_pages( $form ) ) return;
-			wp_enqueue_script( 'gravityforms-savedforms', plugins_url( 'gravityforms-savedforms.js', __FILE__ ), array( 'jquery' ) );
 		}
 
 		public function form_submit_save_autovalidate( $validation_result ) {
