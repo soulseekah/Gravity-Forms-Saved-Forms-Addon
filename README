@@ -1,3 +1,5 @@
+Gravity Forms 1.9+ is not currently supported. See issue #29.
+
 A Gravity Forms Addon for WordPress that lets logged-in users save forms for later. Useful for long forms, etc.
 Upload folder to wp-content/plugins/ visit Dashboard/Plugins/ and activate.
 
