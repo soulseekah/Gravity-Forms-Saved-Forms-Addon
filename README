@@ -1,4 +1,6 @@
-Gravity Forms 1.9+ is not currently supported. See issue #29.
+Gravity Forms 1.9+ introduces the "Save and Continue" functionality. This plugin is not compatible with the "Save and Continue" feature turned on. You can still use "Save and Continue" for some forms and "Saved forms" for others.
+
+Gravity Forms 1.8 support will no longer be maintained.
 
 A Gravity Forms Addon for WordPress that lets logged-in users save forms for later. Useful for long forms, etc.
 Upload folder to wp-content/plugins/ visit Dashboard/Plugins/ and activate.

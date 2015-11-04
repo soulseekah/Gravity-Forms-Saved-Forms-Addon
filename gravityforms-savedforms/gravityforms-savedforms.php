@@ -3,7 +3,7 @@
 		Plugin Name: Gravity Forms Saved Forms Add-On
 		Author: Gennady Kovshenin
 		Description: Adds state to forms allowing users to save form for later
-		Version: 0.4.3.1
+		Version: 0.5.0.0
 		Author URI: http://codeseekah.com
 	*/
 
@@ -34,17 +34,18 @@
 
 			/* Form Settings/Advanced */
 			add_filter( 'gform_form_settings', array( $this, 'save_form_settings' ), null, 2 );
-			add_filter( 'gform_notification_ui_settings', array( $this, 'notification_settings' ), null, 3 );
-			add_filter( 'gform_pre_notification_save', array( $this, 'save_notification_settings' ), null, 2 );
 
 			/* Form frontend logic */
-			add_filter( 'gform_pre_render', array( $this, 'try_restore_saved_state' ) );
 			add_filter( 'gform_submit_button', array( $this, 'form_add_save_button'), null, 2 );
 			add_filter( 'gform_next_button', array( $this, 'form_add_save_button'), null, 2 );
-			add_filter( 'gform_validation', array( $this, 'form_submit_save_autovalidate' ) );
-			add_filter( 'gform_confirmation', array( $this, 'form_save_confirmation' ), null, 4 );
-			add_filter( 'gform_disable_notification', array( $this, 'disable_notification_on_save' ), null, 4 );
-			add_action( 'init', array( $this, 'maybe_save_confirmation' ) );
+			add_filter( 'gform_form_post_get_meta', array( $this, 'form_save_confirmation' ), null );
+
+			/* Restore logic */
+			add_action( 'gform_form_args', array( $this, 'form_restore' ) );
+
+			/* Save logic */
+			add_action( 'gform_incomplete_submission_post_save', array( $this, 'form_save' ), null, 4 );
+			add_action( 'gform_post_submission', array( $this, 'form_submit' ), null, 2 );
 
 			/* Pending and completed entries */
 			add_filter( 'gform_addon_navigation', array( $this, 'add_pending_completed_entries_item' ) );
@@ -111,94 +112,6 @@
 			<?php
 		}
 
-		public function notification_settings( $ui_settings, $notification, $form ) {
-			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] ) return $ui_settings;
-
-			ob_start();
-			?>
-				<tr valign="top">
-					<th scope="row">
-						<label for="gform_notification_send_on_save_state"><?php _e( 'Send on save state', 'gravityforms' ); ?></label>
-					</th>
-					<td>
-						<?php if ( !isset( $notification['sendOnSave'] ) ) $notification['sendOnSave'] = false; ?>
-						<input type="checkbox" name="gform_notification_send_on_save_state" id="gform_notification_send_on_save_state" value="1" <?php checked( $notification['sendOnSave'], true ); ?>/>
-						<label for="gform_notification_send_on_save_state" class="inline"><?php _e( 'Send this notification when the form is saved', 'gravityforms' ); ?></label>
-					</td>
-				</tr>
-			<?php
-			$ui_settings['notification_send_on_save_state'] = ob_get_clean();
-
-			return $ui_settings;
-		}
-
-		public function save_notification_settings( $notification, $form ) {
-			$notification['sendOnSave'] = isset( $_POST['gform_notification_send_on_save_state'] );
-			return $notification;
-		}
-
-		public function try_restore_saved_state( $form ) {
-			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] ) return $form;
-			/**
-			 * We are currently unable to restore values of a saved form
-			 * when a different form on the page is being navigated, saved or
-			 * submitted. See issue #27.
-			 */
-			if ( isset( $_POST['gform_submit'] ) && $_POST['gform_submit'] != $form['id'] ) return $form;
-
-			$user = wp_get_current_user();
-
-			$lead_id = get_user_meta( $user->ID, 'has_pending_form_'.$form['id'], true );
-			if ( !$lead_id ) return $form;
-
-			$lead = RGFormsModel::get_lead( $lead_id );
-
-			/* populate the available values */
-			foreach ( $form['fields'] as $form_part ) {
-				if ( $form_part['inputs'] === null || $form_part['inputs'] === '' ) { /* single-part */
-					$input_id = $form_part['id'];
-					if ( !isset( $lead[strval( $input_id )] ) ) continue;
-
-					$input_name = 'input_' . str_replace( '.', '_', strval( $input_id ) );
-
-					// only add value from saved lead if new value is not entered
-					if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
-						continue;
-
-					$_POST[$input_name] = $this->maybe_transform_data( $lead[strval( $input_id )], $lead, $form_part, $form );
-
-				} else foreach ( $form_part['inputs'] as $input ) { /* multi-part */
-					if ( !isset( $lead[strval( $input['id'] )] ) ) continue;
-
-					$input_name = 'input_' . str_replace( '.', '_', strval( $input['id'] ) );
-
-					// only add value from saved lead if new value is not entered
-					if( isset( $_POST[$input_name] ) && !empty( $_POST[$input_name] ) )
-						continue;
-
-					$_POST[$input_name] = $this->maybe_transform_data( $lead[strval( $input['id'] )], $lead, $form_part, $form );
-
-				}
-
-			}
-
-			$_POST['is_submit_'.$form['id']] = '1'; /* force the form to be poisoned */
-
-			return $form;
-		}
-
-		private function maybe_transform_data( $data, $lead, $form_part, $form ) {
-			if ( $form_part['type']  == 'list' && $form_part['enableColumns'] ) {
-				$_data = array();
-				$data = unserialize( $data );
-				foreach ( is_array( $data ) ? $data : array() as $row ) {
-					$_data = array_merge( $_data, array_values( $row ) );
-				}
-				return $_data;
-			}
-			return $data;
-		}
-
 		public function form_add_save_button( $button_input, $form ) {
 			/* there's nothing to be done if form state or login requirements are off */
 			if ( !isset($form['requireLogin']) || !isset($form['enableFormState']) ) return $button_input;
@@ -209,98 +122,138 @@
 				$tabindex_match = intval( $_tabindex_match[1] ) + 1;
 			}
 
-			$button_input .= '<input type="submit" id="gform_save_state_'.$form['id'].'" class="gform_save_state button gform_button" name="gform_save_state_'.$form['id'].'" value="'
-							.__( "Save for later", self::$textdomain ).'" tabindex="'.$tabindex_match.'">';
+			$onclick = esc_attr( str_replace( '%d', $form['id'], 'if(window["gf_submitting_%d"]){return false;}'
+				. 'window["gf_submitting_%d"]=true;'
+				. 'jQuery("#gform_save_%d").length || jQuery("#gform_%d").append("<input type=\"hidden\" id=\"gform_save_%d\" name=\"gform_save_%d\">");'
+				. 'jQuery("#gform_save_%d").val(1); jQuery("#gform_%d").trigger("submit",[true]);'
+			) );
+
+			$button_input .= '<input type="submit" id="gform_save_state_'.$form['id'].'" class="gform_save_state button gform_button" name="gform_save" value="'
+							.__( "Save for later", self::$textdomain ).'" tabindex="'.$tabindex_match.'" onclick="'.$onclick.'">';
 			return $button_input;
 		}
 
-		public function form_submit_save_autovalidate( $validation_result ) {
-
-			if ( !isset( $validation_result['form']['enableFormState'] ) ) return $validation_result;
-			if ( !$validation_result['form']['enableFormState'] ) return $validation_result;
-			if ( !isset( $_POST['gform_save_state_'.$validation_result['form']['id']] ) ) return $validation_result;
-
-			/* forms that support states can be saved even if not valid */
-			$validation_result['is_valid'] = true;
-
-			return $validation_result;
-		}
-
-		public function form_save_confirmation( $confirmation, $form, $lead, $ajax ) {
-
-			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] ) return $confirmation;
+		/**
+		 * Injects the necessary save confirmation message
+		 *
+		 * At an early stage when our plugin is active we inject
+		 *  the confirmation message. This message cannot be deleted
+		 *  or modified within the Forms/Confirmations settings in the
+		 *  admin. This will need to be addressed some time later.
+		 *
+		 * This is done on the `gform_form_post_get_meta` action as at
+		 *  the time of writing, the saved forms logic in Gravity Forms
+		 *  provides no other hooks to inject a custom confirmation with
+		 *  a type of 'form_saved'.
+		 *
+		 * @param GFForm $form The form
+		 *
+		 * @return GFForm The modified form
+		 */
+		public function form_save_confirmation( $form ) {
+			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] )
+				return $form;
 
 			$user = wp_get_current_user();
+			if ( !$user )
+				return $form;
 
-			if ( !isset( $_POST['gform_save_state_'.$form['id']] ) ) {
-				if ( !empty( $form['enableFormStateOnSubmit'] ) && $form['enableFormStateOnSubmit'] ) {
-					/* still save, but do submit, thanks */
-					update_user_meta( $user->ID, 'completed_form_'.$form['id'], $lead['id'] );
-					update_user_meta( $user->ID, 'has_pending_form_'.$form['id'], $lead['id'] );
-					return $confirmation;
-				}
+			if ( is_admin() )
+				return $form;
 
-				/* remove all saved data for this form and user */
-				delete_user_meta( $user->ID, 'has_pending_form_'.$form['id'] );
-				update_user_meta( $user->ID, 'completed_form_'.$form['id'], $lead['id'] );
-
-				return $confirmation;
-			}
-
-			if ( !isset( $_POST['gform_save_state_'.$form['id']] ) ) return $confirmation; /* this should never happend */
-
-			/* set pending to user id */
-			gform_update_meta( $lead['id'], 'is_pending', $user->ID );
-			/* set latest pending */
-			update_user_meta( $user->ID, 'has_pending_form_'.$form['id'], $lead['id'] );
-			/* set lead to pending */
-			RGFormsModel::update_lead_property( $lead['id'], 'status', 'pending', false, true );
-
-			do_action( 'gform_save_state', $form, $lead );
-
-			$confirmation = __( 'Your progress has been saved. You can return to this form anytime in the future to complete it.' );
-			return $confirmation;
+			$form['confirmations']['gform_saved_forms'] = array(
+				'id' => 'gform_saved_forms',
+				'name' => __( 'Save confirmation', self::$textdomain ),
+				'event' => 'form_saved',
+				'message' => __( 'Your progress has been saved. You can return to this form anytime in the future to complete it.', self::$textdomain ),
+			);
+			return $form;
 		}
 
-		public function maybe_save_confirmation() {
-			/* On paged forms all processing is suppressed, so we still need to do something */
-			$form_id = isset( $_POST['gform_submit'] ) ? $_POST['gform_submit'] : 0;
-			if ( !$form_id ) return;
+		/**
+		 * Do the necessary saved form housekeeping
+		 *
+		 * Called on the `gform_incomplete_submission_post_save` action.
+		 *
+		 * Since Gravity Forms doesn't save the user's ID even when forms
+		 *  require login, we need to save the user ID ourselves. We could do
+		 *  this in the form metadata I guess, but for now we'll do the old
+		 *  way of saving in the user metadata instead.
+		 *
+		 * @param array $submission The current submission
+		 * @param string $resume_token The secret resume token
+		 * @param GFForm $form The current form
+		 * @param array $form The entry
+		 *
+		 * @return void
+		 */
+		public function form_save( $submission, $resume_token, $form, $entry ) {
+			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] )
+				return;
 
-			if ( !isset( $_POST['gform_save_state_'.$form_id] ) ) return;
+			$user = wp_get_current_user();
+			if ( !$user )
+				return;
 
-			$form_info = RGFormsModel::get_form( $form_id );
-			$is_valid_form = $form_info && $form_info->is_active;
-
-			if ( !$is_valid_form ) return;
-
-			$form = RGFormsModel::get_form_meta( $form_id );
-
-			if ( !isset($form['requireLogin']) || !isset($form['enableFormState']) ) return;
-			if ( !$form['requireLogin'] || !$form['enableFormState'] ) return;
-			if ( !GFCommon::has_pages( $form ) ) return;
-
-			/* Spoof the page number and make-believe */
-			$_POST[ "gform_target_page_number_{$form_id}" ] = 65535;
-			require_once( GFCommon::get_base_path() . '/form_display.php' );
-			GFFormDisplay::process_form( $form_id );
+			update_user_meta( $user->ID, 'has_pending_form_' . $form['id'], $resume_token );
 		}
 
-		public function disable_notification_on_save( $is_disabled, $notification, $form, $entry ) {
-			if ( !isset( $form['enableFormState'] ) ) return $is_disabled;
-			if ( !$form['enableFormState'] ) return $is_disabled;
 
-			if ( !isset( $_POST['gform_save_state_'.$form['id']] ) ) {
-				/* This is a real submit */
-				$is_disabled = isset( $notification['sendOnSave'] ) && $notification['sendOnSave'];
-				return $is_disabled;
-			}
+		/**
+		 * Process a submission
+		 *
+		 * We mark this form as completed for the user. And if "Save on Submit"
+		 *  is not turned on we delete the pending data
+		 *
+		 * @param array The lead
+		 * @param GFForm The form
+		 *
+		 * @return void
+		 */
+		public function form_submit( $lead, $form ) {
+			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] )
+				return;
 
-			/* This is a save submit */
-			if ( isset( $notification['sendOnSave'] ) && $notification['sendOnSave'] ) return $is_disabled;
-			
-			$is_disabled = true;
-			return $is_disabled;
+			$user = wp_get_current_user();
+			if ( !$user )
+				return;
+
+			update_user_meta( $user->ID, 'completed_form_' . $form['id'], true );
+
+			/* only delete the data if save on submit option has not been enabled */
+			if ( !isset( $form['enableFormStateOnSubmit'] ) || !$form['enableFormStateOnSubmit'] )
+				delete_user_meta( $user->ID, 'has_pending_form_' . $form['id'] );
+		}
+
+		/**
+		 * Handle a saved form restore
+		 *
+		 * Called on the `gform_form_args` filter
+		 *
+		 * This is a hack. We basically lie to Gravity Forms
+		 *  and make it think that we have a token in the $_GET
+		 *  superglobal so that its restore logic kicks in.
+		 *
+		 * @param array $args The current form arguments
+		 *
+		 * @return array $args
+		 */
+		public function form_restore( $args ) {
+			if ( empty( $args['form_id'] ) )
+				return $args;
+
+			$form = RGFormsModel::get_form_meta( $args['form_id'] );
+			if ( !isset( $form['enableFormState'] ) || !$form['enableFormState'] )
+				return $args;
+
+			$user = wp_get_current_user();
+			if ( !$user )
+				return $args;
+
+			if ( !isset( $_POST['gform_submit'] ) )
+				$_GET['gf_token'] = get_user_meta( $user->ID, 'has_pending_form_' . $args['form_id'] );
+
+			return $args;
 		}
 
 		public function add_pending_completed_entries_item( $menu_items ) {
@@ -332,11 +285,6 @@
 				else $form_id = $id;
 			}
 			$form = RGFormsModel::get_form_meta( $form_id );
-
-			if ( isset( $_GET['clear'] ) ):
-				check_admin_referer( 'gfstate-clear' );
-				$this->cleanup_saved_entries( $form['id'] ); /* cleanup while we're here */
-			endif;
 
 			?>
 				<link rel="stylesheet" href="<?php echo GFCommon::get_base_url() ?>/css/admin.css" type="text/css" />
@@ -424,14 +372,6 @@
 								<li><a href="user-edit.php?user_id=<?php echo $user->ID; ?>"><?php echo $user->display_name; ?></a></li>
 							<?php endforeach; endif; ?>
 						</ul>
-						<hr />
-						<a class="gfstate-clear" href="<?php echo wp_nonce_url( add_query_arg( 'clear', true ), 'gfstate-clear' ); ?>">clear all pending entries</a>
-						<script type="text/javascript">
-							jQuery( 'a.gfstate-clear' ).click( function( e ) {
-								if ( !confirm( <?php echo json_encode( __( 'Are you sure you want to do this?', self::$textdomain ) ); ?> ) )
-									e.preventDefault();
-							} );
-						</script>
 					<?php endif; ?>
 				</div>
 				</div> <!-- /wrap -->
@@ -453,17 +393,6 @@
 					$user->completed_entry = get_user_meta( $user->ID, 'has_pending_form_'.$form_id, true );
 				}
 				return $users;
-			}
-		}
-
-		public function cleanup_saved_entries( $form_id, $max = 100 ) {
-			/* Removes all entries/leads that are not tied to a user */
-			$leads = RGFormsModel::get_leads( $form_id, 0, 'DESC', '', 0, $max, null, null, false, null, null, 'pending' );
-			RGFormsModel::delete_leads( $leads );
-			foreach ( $this->get_users( $form_id, false ) as $user ) {
-				if ( $user->pending_entry ) {
-					delete_user_meta( $user->ID, 'has_pending_form_'.$form_id );
-				}
 			}
 		}
 	}
